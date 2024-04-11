@@ -3,7 +3,7 @@ import csv
 import pandas as pd
 
 # Open the log file for reading
-fname = 'example1'
+fname = 'alpha2'
 with open('logs/downloads/' + fname + '_log.log', 'r') as log_file:
     # Skip the first line (heading)
     next(log_file)
