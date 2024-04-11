@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import ast
+import math
 
 
 data_all = {'AMETHYSTS' : {"alpha_buy_diff" : 0,
@@ -14,6 +15,11 @@ data_all = {'AMETHYSTS' : {"alpha_buy_diff" : 0,
                            "alpha_tw" : 0,
                            "position" : 0,
                            "pnl" : 0,
+                           "ema_7" : 0,
+                           "ema_25" : 0,
+                           "ema_50" : 0,
+                           "ema_200" : 0,
+                           "alpha_ema" : 0,
                            }, 
 
             'STARFRUIT' : {"alpha_buy_diff" : 0, 
@@ -28,6 +34,11 @@ data_all = {'AMETHYSTS' : {"alpha_buy_diff" : 0,
                            "alpha_tw" : 0,
                            "position" : 0,
                            "pnl" : 0,
+                           "ema_7" : 0,
+                           "ema_25" : 0,
+                           "ema_50" : 0,
+                           "ema_200" : 0,
+                           "alpha_ema" : 0,
                            }
             }
 
@@ -43,7 +54,10 @@ def process_order_book_row(row, logging_data):
     data["price_qty_sell"] = price_qty_sell
 
     data['alpha_buy_diff'] = 0.6*data['alpha_buy_diff'] + 0.4*price_qty_buy_diff
+    data['alpha_buy_diff_norm'] = 0.6*data['alpha_buy_diff_norm'] + 0.4*price_qty_buy_diff/(0.5 + price_qty_buy)
     data['alpha_sell_diff'] = 0.6*data['alpha_sell_diff'] + 0.4*price_qty_sell_diff
+    data['alpha_sell_diff_norm'] = 0.6*data['alpha_sell_diff_norm'] + 0.4*price_qty_sell_diff/(0.5 + price_qty_sell)
+
 
     trades = [(np.float64(item[0]), np.float64(item[1])) for item in ast.literal_eval(row['trades'])]
 
@@ -58,6 +72,14 @@ def process_order_book_row(row, logging_data):
     data["alpha_trades"] = 0.5*data["alpha_trades"] + 0.5*trade_val
     data["alpha_tw"] = 0.5*data["alpha_tw"] + 0.5*tw_val
 
+    hl_7, hl_25, hl_50, hl_200 = pow(2,-1/7), pow(2,-1/25), pow(2,-1/50), pow(2,-1/200)
+    data["ema_7"] = hl_7*data["ema_7"] + (1 - hl_7)*row["mid_price"]
+    data["ema_25"] = hl_25*data["ema_25"] + (1 - hl_25)*row["mid_price"]
+    data["ema_50"] = hl_50*data["ema_50"] + (1 - hl_50)*row["mid_price"]
+    data["ema_200"] = hl_200*data["ema_200"] + (1 - hl_200)*row["mid_price"]
+
+    if (data["ema_7"] - data["ema_25"])*(data["ema_50"] - data["ema_200"]) > 0:
+        data["alpha_ema"] = np.sign(data["ema_50"] - data["ema_200"])/(0.1 + abs(data["ema_50"] - data["ema_200"]))
 
 
 
@@ -75,17 +97,17 @@ def process_order_book_row(row, logging_data):
             data["position"] -= val
             data["pnl"] += row[f"bid_price_{i}"]*val
 
-       
-
+    
     row['alpha_buy_diff'] = data['alpha_buy_diff']
+    row['alpha_buy_diff_norm'] = data['alpha_buy_diff_norm']
     row['alpha_sell_diff'] = data['alpha_sell_diff']
+    row['alpha_sell_diff_norm'] = data['alpha_sell_diff_norm']
     row['alpha_trades'] = data['alpha_trades']
     row['alpha_tw'] = data['alpha_tw']
     row['position'] = data['position']
     row['pnl'] = data['pnl'] + row['mid_price']*data['position']
+    row['alpha_ema'] = data['alpha_ema']
 
-
-    
     # Append the updated row to the logging data DataFrame
     return pd.concat([logging_data, row.to_frame().T], ignore_index=True)
 
